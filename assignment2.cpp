@@ -461,8 +461,8 @@ static Message deliver(const Message &m, EveMode eve,
         return m;
 
     case EVE_LAZY: {
-        cout << "  Eve replaces Alice's value with her own but keeps Alice's\n"
-                "  signature, since she cannot produce a new one as Alice.\n";
+        cout << "  Eve replaces Alice's DH public value with her own but keeps\n"
+                "  Alice's signature, since she cannot produce a new one as Alice.\n";
         Party tmp = eveParty;
         tmp.secret   = randomSecret(bits);
         tmp.dhPublic = par.G.powMod(tmp.secret, par.P);
@@ -471,8 +471,8 @@ static Message deliver(const Message &m, EveMode eve,
     }
 
     case EVE_FORGE: {
-        cout << "  Eve replaces Alice's value with her own and signs it with\n"
-                "  her own RSA key. The signature is genuine, but it is hers.\n";
+        cout << "  Eve replaces Alice's DH public value with her own and signs\n"
+                "  it with her own RSA key. The signature is genuine, but it is hers.\n";
         Party tmp = eveParty;
         partyProduceMessage(tmp, par, bits);
         Message forged{tmp.dhPublic, tmp.signature};
@@ -481,18 +481,18 @@ static Message deliver(const Message &m, EveMode eve,
 
     case EVE_REPLAY:
         // Replay on one leg only. On both legs the run could never agree:
-        // Bob would mix the old value with his fresh secret while Alice
-        // used her fresh secret.
+        // Bob would mix the old public value with his fresh secret while
+        // Alice used her fresh secret.
         if (aliceToBob) {
-            cout << "  Eve replays the old value and signature she recorded.\n"
-                    "  The signature is genuine, so this one passes the gate.\n";
+            cout << "  Eve replays the old DH public value and signature she\n"
+                    "  recorded. The signature is genuine, so it passes the gate.\n";
             return recorded;
         }
         return m;
 
     case EVE_TAMPER: {
         cout << "  Eve passes the message along but flips one bit of Alice's\n"
-                "  value first.\n";
+                "  DH public value first.\n";
         Message t = m;
         mpz_class flipped = t.dhPublic.a;
         mpz_setbit(flipped.get_mpz_t(), 0);
@@ -504,8 +504,8 @@ static Message deliver(const Message &m, EveMode eve,
 
     case EVE_IMPERSONATE_BOB:
         if (!aliceToBob) {
-            cout << "  Eve answers Alice as if she were Bob, using her own\n"
-                    "  value signed with her own key.\n";
+            cout << "  Eve answers Alice as if she were Bob, sending her own\n"
+                    "  DH public value signed with her own key.\n";
             Party tmp = eveParty;
             partyProduceMessage(tmp, par, bits);
             Message forged{tmp.dhPublic, tmp.signature};
@@ -548,14 +548,14 @@ static bool runHandshake(const string &title, EveMode eve,
         recorded.dhPublic  = oldAlice.dhPublic;
         recorded.signature = oldAlice.signature;
         cout << "  Before this run, Eve recorded one of Alice's old signed\n"
-                "  values from an earlier session.\n";
+                "  DH public values from an earlier session.\n";
     }
 
     partyProduceMessage(alice, par, bits);
     cout << "\n  Step 1  Alice picks a fresh secret, computes her DH public\n"
             "          value, and signs it with her RSA key.\n";
-    cout << "          value     = " << alice.dhPublic << "\n";
-    cout << "          signature = " << alice.signature << "\n";
+    cout << "          DH public value = " << alice.dhPublic << "\n";
+    cout << "          signature       = " << alice.signature << "\n";
 
     Message wire1{alice.dhPublic, alice.signature};
     Message got1 = deliver(wire1, eve, eveParty, recorded, par, bits,
@@ -564,16 +564,16 @@ static bool runHandshake(const string &title, EveMode eve,
     cout << "\n  Step 2  Bob checks the signature against Alice's long-term\n"
             "          public key, which he already trusts.\n";
     if (!partyVerifyMessage(alice, got1)) {
-        cout << "          The signature does not match the value. Bob stops\n"
-                "          here and no key is created.\n\n";
+        cout << "          The signature does not match the DH public value.\n"
+                "          Bob stops here and no key is created.\n\n";
         return false;
     }
-    cout << "          It matches, so the value really is Alice's.\n";
+    cout << "          It matches, so this DH public value really is Alice's.\n";
 
     partyProduceMessage(bob, par, bits);
-    cout << "          Bob answers with his own signed value.\n";
-    cout << "          value     = " << bob.dhPublic << "\n";
-    cout << "          signature = " << bob.signature << "\n";
+    cout << "          Bob answers with his own signed DH public value.\n";
+    cout << "          DH public value = " << bob.dhPublic << "\n";
+    cout << "          signature       = " << bob.signature << "\n";
 
     Message wire2{bob.dhPublic, bob.signature};
     Message got2 = deliver(wire2, eve, eveParty, recorded, par, bits,
@@ -581,11 +581,11 @@ static bool runHandshake(const string &title, EveMode eve,
 
     cout << "\n  Step 3  Alice checks Bob's signature the same way.\n";
     if (!partyVerifyMessage(bob, got2)) {
-        cout << "          The signature does not match the value. Alice\n"
-                "          stops here and no key is created.\n\n";
+        cout << "          The signature does not match the DH public value.\n"
+                "          Alice stops here and no key is created.\n\n";
         return false;
     }
-    cout << "          It matches, so the value really is Bob's.\n";
+    cout << "          It matches, so this DH public value really is Bob's.\n";
 
     partyDeriveSharedKey(alice, got2.dhPublic, par);
     partyDeriveSharedKey(bob, got1.dhPublic, par);
@@ -601,9 +601,9 @@ static bool runHandshake(const string &title, EveMode eve,
     cout << "          The keys differ.\n";
     if (eve == EVE_REPLAY)
         cout << "          That is the expected damage here. Bob mixed his\n"
-                "          fresh secret with Alice's old value, Alice mixed\n"
-                "          her fresh secret with Bob's new value, so the two\n"
-                "          keys cannot agree. Eve still learns nothing: she\n"
+                "          fresh secret with Alice's old DH public value, Alice\n"
+                "          mixed her fresh secret with Bob's new one, so the\n"
+                "          two keys cannot agree. Eve still learns nothing: she\n"
                 "          has neither secret, so she cannot compute either\n"
                 "          key. A replay can disrupt a session but it cannot\n"
                 "          expose it.\n";
@@ -658,13 +658,13 @@ static void runPartBDemos()
 
     runHandshake("RUN 1 -- no Eve on the line: a clean handshake",
                  EVE_ABSENT, alice, bob, eve, par, DH_BITS);
-    runHandshake("RUN 2 -- Eve swaps in her own value but keeps Alice's signature",
+    runHandshake("RUN 2 -- Eve swaps in her own DH public value but keeps Alice's signature",
                  EVE_LAZY, alice, bob, eve, par, DH_BITS);
-    runHandshake("RUN 3 -- Eve signs her own value with her own key",
+    runHandshake("RUN 3 -- Eve signs her own DH public value with her own key",
                  EVE_FORGE, alice, bob, eve, par, DH_BITS);
-    runHandshake("RUN 4 -- Eve replays an old signed value from Alice",
+    runHandshake("RUN 4 -- Eve replays an old signed DH public value from Alice",
                  EVE_REPLAY, alice, bob, eve, par, DH_BITS);
-    runHandshake("RUN 5 -- Eve flips one bit of Alice's value",
+    runHandshake("RUN 5 -- Eve flips one bit of Alice's DH public value",
                  EVE_TAMPER, alice, bob, eve, par, DH_BITS);
     runHandshake("RUN 6 -- Eve answers Alice pretending to be Bob",
                  EVE_IMPERSONATE_BOB, alice, bob, eve, par, DH_BITS);
