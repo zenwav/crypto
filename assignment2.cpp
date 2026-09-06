@@ -658,27 +658,27 @@ static void runPartBDemos()
     mpz_class ordG = trackOrder1 / lg * trackOrder2;
     cout << "  ord(G) = lcm(a-1, a+b-1) = " << ordG << "\n\n";
 
-    runHandshake("RUN 1 -- no Eve on the line: a clean handshake",
+    bool r1 = runHandshake("RUN 1 -- no Eve on the line: a clean handshake",
                  EVE_ABSENT, alice, bob, eve, par, DH_BITS);
-    runHandshake("RUN 2 -- Eve swaps in her own DH public value but keeps Alice's signature",
+    bool r2 = runHandshake("RUN 2 -- Eve swaps in her own DH public value but keeps Alice's signature",
                  EVE_LAZY, alice, bob, eve, par, DH_BITS);
-    runHandshake("RUN 3 -- Eve signs her own DH public value with her own key",
+    bool r3 = runHandshake("RUN 3 -- Eve signs her own DH public value with her own key",
                  EVE_FORGE, alice, bob, eve, par, DH_BITS);
-    runHandshake("RUN 4 -- Eve replays an old signed DH public value from Alice",
+    bool r4 = runHandshake("RUN 4 -- Eve replays an old signed DH public value from Alice",
                  EVE_REPLAY, alice, bob, eve, par, DH_BITS);
-    runHandshake("RUN 5 -- Eve flips one bit of Alice's DH public value",
+    bool r5 = runHandshake("RUN 5 -- Eve flips one bit of Alice's DH public value",
                  EVE_TAMPER, alice, bob, eve, par, DH_BITS);
-    runHandshake("RUN 6 -- Eve answers Alice pretending to be Bob",
+    bool r6 = runHandshake("RUN 6 -- Eve answers Alice pretending to be Bob",
                  EVE_IMPERSONATE_BOB, alice, bob, eve, par, DH_BITS);
-    runHandshake("RUN 7 -- Eve replaces the shared generator with 1",
+    bool r7 = runHandshake("RUN 7 -- Eve replaces the shared generator with 1",
                  EVE_POISON_G, alice, bob, eve, par, DH_BITS);
 
     cout << "============================================================\n";
-    cout << "Summary. The clean run went through with matching keys. Runs 2,\n"
-            "3, 5 and 6 all died at a signature check, run 7 never got past\n"
-            "the parameter check, and the replay in run 4 is the one case a\n"
-            "signature cannot stop; even there Eve walks away with nothing,\n"
-            "she only manages to break the session's agreement.\n";
+    cout << "Outcome per run (completed = both sides agreed on one key):\n";
+    bool results[7] = {r1, r2, r3, r4, r5, r6, r7};
+    for (int i = 0; i < 7; i++)
+        cout << "  RUN " << (i + 1) << ": "
+             << (results[i] ? "completed" : "aborted") << "\n";
 }
 
 int main(int argc, char **argv)

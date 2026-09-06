@@ -183,8 +183,11 @@ RUN 7 -- Eve replaces the shared generator with 1
   parameters and the protocol stops before it starts.
 
 ============================================================
-Summary. The clean run went through with matching keys. Runs 2,
-3, 5 and 6 all died at a signature check, run 7 never got past
-the parameter check, and the replay in run 4 is the one case a
-signature cannot stop; even there Eve walks away with nothing,
-she only manages to break the session's agreement.
+Outcome per run (completed = both sides agreed on one key):
+  RUN 1: completed
+  RUN 2: aborted
+  RUN 3: aborted
+  RUN 4: aborted
+  RUN 5: aborted
+  RUN 6: aborted
+  RUN 7: aborted
