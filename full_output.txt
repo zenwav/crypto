@@ -182,12 +182,3 @@ RUN 7 -- Eve replaces the shared generator with 1
   The generator is trivial, so both sides reject the
   parameters and the protocol stops before it starts.
 
-============================================================
-Outcome per run (completed = both sides agreed on one key):
-  RUN 1: completed
-  RUN 2: aborted
-  RUN 3: aborted
-  RUN 4: aborted
-  RUN 5: aborted
-  RUN 6: aborted
-  RUN 7: aborted

@@ -519,7 +519,7 @@ static Message deliver(const Message &m, EveMode eve,
     return m;
 }
 
-static bool runHandshake(const string &title, EveMode eve,
+static void runHandshake(const string &title, EveMode eve,
                          Party &alice, Party &bob, Party &eveParty,
                          const DHParams &parIn, int bits)
 {
@@ -537,7 +537,7 @@ static bool runHandshake(const string &title, EveMode eve,
     if (!dhParamsSane(par)) {
         cout << "  The generator is trivial, so both sides reject the\n"
                 "  parameters and the protocol stops before it starts.\n\n";
-        return false;
+        return;
     }
     cout << "  Parameter check passed: both generator coordinates exceed 1.\n";
 
@@ -566,7 +566,7 @@ static bool runHandshake(const string &title, EveMode eve,
     if (!partyVerifyMessage(alice, got1)) {
         cout << "          The signature does not match the DH public value.\n"
                 "          Bob stops here and no key is created.\n\n";
-        return false;
+        return;
     }
     cout << "          It matches, so this DH public value really is Alice's.\n";
 
@@ -583,7 +583,7 @@ static bool runHandshake(const string &title, EveMode eve,
     if (!partyVerifyMessage(bob, got2)) {
         cout << "          The signature does not match the DH public value.\n"
                 "          Alice stops here and no key is created.\n\n";
-        return false;
+        return;
     }
     cout << "          It matches, so this DH public value really is Bob's.\n";
 
@@ -596,7 +596,7 @@ static bool runHandshake(const string &title, EveMode eve,
 
     if (alice.sharedKey == bob.sharedKey) {
         cout << "          The keys are identical. Agreement succeeded.\n\n";
-        return true;
+        return;
     }
     cout << "          The keys differ.\n";
     if (eve == EVE_REPLAY)
@@ -608,7 +608,6 @@ static bool runHandshake(const string &title, EveMode eve,
                 "          key. A replay can disrupt a session but it cannot\n"
                 "          expose it.\n";
     cout << "\n";
-    return false;
 }
 
 static void runPartBDemos()
@@ -658,27 +657,20 @@ static void runPartBDemos()
     mpz_class ordG = trackOrder1 / lg * trackOrder2;
     cout << "  ord(G) = lcm(a-1, a+b-1) = " << ordG << "\n\n";
 
-    bool r1 = runHandshake("RUN 1 -- no Eve on the line: a clean handshake",
+    runHandshake("RUN 1 -- no Eve on the line: a clean handshake",
                  EVE_ABSENT, alice, bob, eve, par, DH_BITS);
-    bool r2 = runHandshake("RUN 2 -- Eve swaps in her own DH public value but keeps Alice's signature",
+    runHandshake("RUN 2 -- Eve swaps in her own DH public value but keeps Alice's signature",
                  EVE_LAZY, alice, bob, eve, par, DH_BITS);
-    bool r3 = runHandshake("RUN 3 -- Eve signs her own DH public value with her own key",
+    runHandshake("RUN 3 -- Eve signs her own DH public value with her own key",
                  EVE_FORGE, alice, bob, eve, par, DH_BITS);
-    bool r4 = runHandshake("RUN 4 -- Eve replays an old signed DH public value from Alice",
+    runHandshake("RUN 4 -- Eve replays an old signed DH public value from Alice",
                  EVE_REPLAY, alice, bob, eve, par, DH_BITS);
-    bool r5 = runHandshake("RUN 5 -- Eve flips one bit of Alice's DH public value",
+    runHandshake("RUN 5 -- Eve flips one bit of Alice's DH public value",
                  EVE_TAMPER, alice, bob, eve, par, DH_BITS);
-    bool r6 = runHandshake("RUN 6 -- Eve answers Alice pretending to be Bob",
+    runHandshake("RUN 6 -- Eve answers Alice pretending to be Bob",
                  EVE_IMPERSONATE_BOB, alice, bob, eve, par, DH_BITS);
-    bool r7 = runHandshake("RUN 7 -- Eve replaces the shared generator with 1",
+    runHandshake("RUN 7 -- Eve replaces the shared generator with 1",
                  EVE_POISON_G, alice, bob, eve, par, DH_BITS);
-
-    cout << "============================================================\n";
-    cout << "Outcome per run (completed = both sides agreed on one key):\n";
-    bool results[7] = {r1, r2, r3, r4, r5, r6, r7};
-    for (int i = 0; i < 7; i++)
-        cout << "  RUN " << (i + 1) << ": "
-             << (results[i] ? "completed" : "aborted") << "\n";
 }
 
 int main(int argc, char **argv)
