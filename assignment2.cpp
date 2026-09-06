@@ -649,7 +649,12 @@ static void runPartBDemos()
          << " generates the units mod p.\n";
     cout << "    Track 2 passes the same test with g = " << g2.get_str() << ".\n";
     cout << "\n";
-    cout << "  G = " << par.G << "\n\n";
+    cout << "  G = " << par.G << "\n";
+
+    mpz_class trackOrder1 = par.p1 - 1, trackOrder2 = par.p2 - 1, lg;
+    mpz_gcd(lg.get_mpz_t(), trackOrder1.get_mpz_t(), trackOrder2.get_mpz_t());
+    mpz_class ordG = trackOrder1 / lg * trackOrder2;
+    cout << "  ord(G) = lcm(a-1, a+b-1) = " << ordG << "\n\n";
 
     runHandshake("RUN 1 -- no Eve on the line: a clean handshake",
                  EVE_ABSENT, alice, bob, eve, par, DH_BITS);
