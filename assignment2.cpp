@@ -639,15 +639,17 @@ static void runPartBDemos()
     cout << "  P = " << par.P << "\n";
     cout << "  Both coordinates of P are 256-bit safe primes p = 2q + 1.\n";
     cout << "\n";
-    cout << "  Generator search, track 1:\n";
+    cout << "  Finding a generator for the first coordinate, p = "
+         << par.p1.get_str() << ":\n";
     cout << "    try g = " << g1.get_str() << "\n";
     cout << "    g^((p-1)/2) mod p = "
          << powModPlain(g1, par.q1, par.p1).get_str() << "\n";
     cout << "    g^((p-1)/q) mod p = "
          << powModPlain(g1, mpz_class(2), par.p1).get_str() << "\n";
-    cout << "    Neither result is 1, so " << g1.get_str()
+    cout << "    Neither is 1, so " << g1.get_str()
          << " generates the units mod p.\n";
-    cout << "    Track 2 passes the same test with g = " << g2.get_str() << ".\n";
+    cout << "  The second coordinate accepts g = " << g2.get_str()
+         << " by the same test.\n";
     cout << "\n";
     cout << "  G = " << par.G << "\n";
 
