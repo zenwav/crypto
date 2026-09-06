@@ -13,7 +13,14 @@
 
 using namespace std;
 
+// Fixed seed so every run produces the same keys and the same console
+// output. Change this constant for a fresh set of values.
 static gmp_randclass rng(gmp_randinit_mt);
+
+static void seedRng()
+{
+    rng.seed(mpz_class("12345678901234567890"));
+}
 
 // ============================================================================
 //
@@ -670,6 +677,8 @@ static void runPartBDemos()
 int main(int argc, char **argv)
 {
     string mode = (argc > 1) ? argv[1] : "all";
+
+    seedRng();
 
     if (mode == "partA") {
         runPartATests();
