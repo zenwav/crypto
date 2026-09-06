@@ -3,33 +3,43 @@ PASS  A.1 to_coords: 3+2I -> (3,5)
 PASS  A.1 from_coords: (7,12) -> 7+5I
 PASS  A.2 add: (3+2I)+(5+6I) = 8+8I
 PASS  A.2 add: (4-3I)+(1+5I) = 5+2I
-PASS  A.3 mul: (3+2I)(5+6I) = 15+40I  [paper]
-PASS  A.3 mul: (3+2I)(7+4I) = 21+34I  [paper]
-PASS  A.4 isCoprime: (3+2I, 7+4I) coprime  [paper]
+PASS  A.3 mul: (3+2I)(5+6I) = 15+40I
+PASS  A.3 mul: (3+2I)(7+4I) = 21+34I
+PASS  A.4 isCoprime: (3+2I, 7+4I) coprime
 PASS  A.4 isCoprime: (2+2I, 4+4I) NOT coprime
-PASS  A.5 phiS: phiS(15+40I) = 8+32I  [paper]
-PASS  A.5 phiS: phiS(21+34I) = 12+28I  [paper]
+PASS  A.5 phiS: phiS(15+40I) = 8+32I
+PASS  A.5 phiS: phiS(21+34I) = 12+28I
 PASS  A.5 phiS: multiplicativity agrees with definition
-PASS  A.6 powmod: (3+3I)^(5+6I) mod (21+34I) = 12-6I  [paper]
-PASS  A.6 powmod: (2+6I)^(17+14I) mod (91+116I) = 32+138I  [paper]
-PASS  A.7 invMod: (5+6I)^-1 mod (12+28I) = 5+6I  [paper]
-PASS  A.7 invMod: (17+14I)^-1 mod (72+108I) = 17+134I  [paper]
+PASS  A.6 powmod: (3+3I)^(5+6I) mod (21+34I) = 12-6I
+PASS  A.6 powmod: (2+6I)^(17+14I) mod (91+116I) = 32+138I
+PASS  A.7 invMod: (5+6I)^-1 mod (12+28I) = 5+6I
+PASS  A.7 invMod: (17+14I)^-1 mod (72+108I) = 17+134I
 PASS  A.7 invMod: E * E^-1 == 1 (mod phiN) round-trip
-PASS  RSA toy: decrypt(encrypt(3+3I)) = 3+3I  [paper]
+PASS  RSA round-trip: decrypt(encrypt(3+3I)) = 3+3I
 All Part A tests passed.
 
 ==================== PART B : authenticated DHKE ====================
-Generating long-term neutrosophic RSA key pairs (257-bit primes)
-for Alice, Bob and Eve, and the 256-bit safe-prime DH group...
-(This is the slow part -- hunting four safe primes.)
+Generating long-term neutrosophic RSA key pairs for Alice, Bob and
+Eve, plus the shared neutrosophic DH group.
+RSA uses 257-bit primes and DH uses 256-bit primes. Both clear the
+256-bit minimum; the extra RSA bit guarantees a DH public value is
+always smaller than the RSA modulus on both tracks, so signing never
+wraps.
 
 DH public parameters:
-  neutrosophic modulus P   = 103007254361409947529281259249467338322881397281212800788186459361404740475859 + (10367512205376885636920483245976937252577552648481741780191998147994071121644)I   [both coordinates 256-bit primes]
-  generator G              = 2 + (3)I
-  (G's coordinates 2 and 5 are primitive roots of the two tracks)
-  check: g1^((a-1)/2) mod a   = 103007254361409947529281259249467338322881397281212800788186459361404740475858  (must be != 1)
-  check: g1^((a-1)/q1) mod a  = 4  (must be != 1)
-  order of G = lcm(a-1, a+b-1) (both tracks generate fully)
+  neutrosophic modulus P = 103007254361409947529281259249467338322881397281212800788186459361404740475859 + (10367512205376885636920483245976937252577552648481741780191998147994071121644)I
+  Both coordinates of P are 256-bit safe primes p = 2q + 1, so the
+  factorisation of p - 1 is known and a generator can be verified
+  with two exponentiations per track.
+
+  Primitive-root check on track 1 (p = first coordinate of P):
+    candidate g = 2
+    g^((p-1)/2) mod p = 103007254361409947529281259249467338322881397281212800788186459361404740475858
+    g^((p-1)/q) mod p = 4
+    Neither is 1, so 2 generates the units mod p. Track 2 accepts 5 by the same test.
+
+  generator G = 2 + (3)I   (coordinates 2 and 5, one primitive root per track)
+  ord(G) = lcm(a-1, a+b-1)
 
 ------------------------------------------------------------
 RUN 1 -- honest channel (no Eve): correctness

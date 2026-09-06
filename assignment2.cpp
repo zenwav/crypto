@@ -280,12 +280,12 @@ static void runPartATests()
     {
         // Paper example: A = 3+2I, B = 5+6I  ->  A.B = 15 + 40I.
         NeutrosophicInt A(3, 2), B(5, 6);
-        check("A.3 mul: (3+2I)(5+6I) = 15+40I  [paper]",
+        check("A.3 mul: (3+2I)(5+6I) = 15+40I",
               A.mul(B) == NeutrosophicInt(15, 40));
 
         // Paper example (RSA section): P = 3+2I, Q = 7+4I -> N = 21 + 34I.
         NeutrosophicInt P(3, 2), Q(7, 4);
-        check("A.3 mul: (3+2I)(7+4I) = 21+34I  [paper]",
+        check("A.3 mul: (3+2I)(7+4I) = 21+34I",
               P.mul(Q) == NeutrosophicInt(21, 34));
     }
 
@@ -293,7 +293,7 @@ static void runPartATests()
     {
         // Paper example: gcd(3+2I, 7+4I) = 1 because gcd(3,7)=gcd(5,11)=1.
         NeutrosophicInt P(3, 2), Q(7, 4);
-        check("A.4 isCoprime: (3+2I, 7+4I) coprime  [paper]",
+        check("A.4 isCoprime: (3+2I, 7+4I) coprime",
               P.isCoprime(Q));
 
         // Own example: gcd(2+2I, 4+4I) != 1 because gcd(2,4)=2 on track 1.
@@ -307,13 +307,13 @@ static void runPartATests()
         // Paper example: phiS(15 + 40I) = phi(15) + [phi(55)-phi(15)]I
         //              = 8 + (40-8)I = 8 + 32I.
         NeutrosophicInt AB(15, 40);
-        check("A.5 phiS: phiS(15+40I) = 8+32I  [paper]",
+        check("A.5 phiS: phiS(15+40I) = 8+32I",
               AB.phiS() == NeutrosophicInt(8, 32));
 
         // Paper example: phiS(21 + 34I) = phi(21) + [phi(55)-phi(21)]I
         //              = 12 + (40-12)I = 12 + 28I.
         NeutrosophicInt N(21, 34);
-        check("A.5 phiS: phiS(21+34I) = 12+28I  [paper]",
+        check("A.5 phiS: phiS(21+34I) = 12+28I",
               N.phiS() == NeutrosophicInt(12, 28));
 
         // Cross-check with the prime-factor formula (Theorem 1.10):
@@ -329,12 +329,12 @@ static void runPartATests()
         // Paper RSA example: M = 3+3I, E = 5+6I, N = 21+34I.
         // C = M^E mod N = 12 - 6I.
         NeutrosophicInt M(3, 3), E(5, 6), N(21, 34);
-        check("A.6 powmod: (3+3I)^(5+6I) mod (21+34I) = 12-6I  [paper]",
+        check("A.6 powmod: (3+3I)^(5+6I) mod (21+34I) = 12-6I",
               M.powmod(E, N) == NeutrosophicInt(12, -6));
 
         // Paper RSA example: C = (2+6I)^(17+14I) mod (91+116I) = 32 + 138I.
         NeutrosophicInt M2(2, 6), E2(17, 14), N2(91, 116);
-        check("A.6 powmod: (2+6I)^(17+14I) mod (91+116I) = 32+138I  [paper]",
+        check("A.6 powmod: (2+6I)^(17+14I) mod (91+116I) = 32+138I",
               M2.powmod(E2, N2) == NeutrosophicInt(32, 138));
     }
 
@@ -344,13 +344,13 @@ static void runPartATests()
         // is 5 + 6I again (it is self-inverse).
         NeutrosophicInt E(5, 6), phiN(12, 28), inv;
         bool ok = E.invMod(phiN, inv);
-        check("A.7 invMod: (5+6I)^-1 mod (12+28I) = 5+6I  [paper]",
+        check("A.7 invMod: (5+6I)^-1 mod (12+28I) = 5+6I",
               ok && inv == NeutrosophicInt(5, 6));
 
         // Paper example: inverse of 17+14I modulo 72+108I is 17 + 134I.
         NeutrosophicInt E2(17, 14), phiN2(72, 108), inv2;
         bool ok2 = E2.invMod(phiN2, inv2);
-        check("A.7 invMod: (17+14I)^-1 mod (72+108I) = 17+134I  [paper]",
+        check("A.7 invMod: (17+14I)^-1 mod (72+108I) = 17+134I",
               ok2 && inv2 == NeutrosophicInt(17, 134));
 
         // Own round-trip check: E * E^-1 == 1 modulo phiN on both tracks.
@@ -372,7 +372,7 @@ static void runPartATests()
         NeutrosophicInt D;
         E.invMod(phiN, D);                            // private exponent
         NeutrosophicInt back = C.powmod(D, N);       // decrypt
-        check("RSA toy: decrypt(encrypt(3+3I)) = 3+3I  [paper]",
+        check("RSA round-trip: decrypt(encrypt(3+3I)) = 3+3I",
               back == M);
     }
 
@@ -808,9 +808,12 @@ static bool runHandshake(const string &title, EveMode eve,
 static void runPartBDemos()
 {
     cout << "==================== PART B : authenticated DHKE ====================\n";
-    cout << "Generating long-term neutrosophic RSA key pairs (257-bit primes)\n"
-            "for Alice, Bob and Eve, and the 256-bit safe-prime DH group...\n";
-    cout << "(This is the slow part -- hunting four safe primes.)\n\n";
+    cout << "Generating long-term neutrosophic RSA key pairs for Alice, Bob and\n"
+            "Eve, plus the shared neutrosophic DH group.\n"
+            "RSA uses 257-bit primes and DH uses 256-bit primes. Both clear the\n"
+            "256-bit minimum; the extra RSA bit guarantees a DH public value is\n"
+            "always smaller than the RSA modulus on both tracks, so signing never\n"
+            "wraps.\n\n";
 
     const int RSA_BITS = 257;   // RSA primes: one bit above the DH size so a
                                 // DH public value always fits inside the
@@ -832,15 +835,25 @@ static void runPartBDemos()
     mpz_class g1, g2;
     par.G.to_coords(g1, g2);
     cout << "DH public parameters:\n";
-    cout << "  neutrosophic modulus P   = " << par.P << "   [both coordinates 256-bit primes]\n";
-    cout << "  generator G              = " << par.G << "\n";
-    cout << "  (G's coordinates " << g1.get_str() << " and " << g2.get_str()
-         << " are primitive roots of the two tracks)\n";
-    cout << "  check: g1^((a-1)/2) mod a   = "
-         << powmodOrdinary(g1, par.q1, par.p1).get_str() << "  (must be != 1)\n";
-    cout << "  check: g1^((a-1)/q1) mod a  = "
-         << powmodOrdinary(g1, mpz_class(2), par.p1).get_str() << "  (must be != 1)\n";
-    cout << "  order of G = lcm(a-1, a+b-1) (both tracks generate fully)\n\n";
+    cout << "  neutrosophic modulus P = " << par.P << "\n";
+    cout << "  Both coordinates of P are 256-bit safe primes p = 2q + 1, so the\n"
+            "  factorisation of p - 1 is known and a generator can be verified\n"
+            "  with two exponentiations per track.\n";
+
+    cout << "\n  Primitive-root check on track 1 (p = first coordinate of P):\n";
+    cout << "    candidate g = " << g1.get_str() << "\n";
+    cout << "    g^((p-1)/2) mod p = "
+         << powmodOrdinary(g1, par.q1, par.p1).get_str() << "\n";
+    cout << "    g^((p-1)/q) mod p = "
+         << powmodOrdinary(g1, mpz_class(2), par.p1).get_str() << "\n";
+    cout << "    Neither is 1, so " << g1.get_str()
+         << " generates the units mod p. Track 2 accepts " << g2.get_str()
+         << " by the same test.\n";
+
+    cout << "\n  generator G = " << par.G
+         << "   (coordinates " << g1.get_str() << " and " << g2.get_str()
+         << ", one primitive root per track)\n";
+    cout << "  ord(G) = lcm(a-1, a+b-1)\n\n";
 
     runHandshake("RUN 1 -- honest channel (no Eve): correctness",
                  EVE_ABSENT, alice, bob, eve, par, DH_BITS);
