@@ -1,0 +1,508 @@
+SIL7159: Cryptography and Cryptanalysis
+Assignment 2 report
+Neutrosophic arithmetic and authenticated Diffie-Hellman key exchange
+
+
+1. Purpose of the work
+
+This assignment has two connected parts. Part A builds the arithmetic needed for neutrosophic integers. Part B uses that arithmetic to perform an authenticated Diffie-Hellman Key Exchange (DHKE). The authentication is provided by neutrosophic Rivest-Shamir-Adleman (RSA) signatures. Alice and Bob are the honest parties, while Eve controls the communication channel and tries several attacks.
+
+I implemented both parts in one C++ source file named dhke.cpp. The program uses the GNU Multiple Precision Arithmetic Library (GMP) through its mpz_class C++ type [4]. This allows the same code to work with the small values used for hand-checkable unit tests and the values of 256 bits or more required for the key exchange.
+
+In the clean test, Alice and Bob obtain the same shared value. In four other tests, the receiver rejects Eve's changed value or wrong RSA key. The demonstrations also show an important limit: a genuine old message passes signature verification because the protocol has no nonce, timestamp or session identifier. Therefore, this is a coursework implementation of the required protocol, not a claim of production-level security.
+
+
+2. Mathematical basis
+
+2.1 Neutrosophic integers
+
+A neutrosophic integer has the form
+
+    X = a + bI,
+
+where a and b are ordinary integers and I is an indeterminacy symbol with the rule
+
+    I^2 = I.
+
+Addition follows the usual coefficient rule:
+
+    (a + bI) + (c + dI) = (a + c) + (b + d)I.
+
+Multiplication first expands the terms and then replaces I^2 by I:
+
+    (a + bI)(c + dI) = ac + (ad + bc + bd)I.
+
+2.2 Coordinate map
+
+The most useful idea in the implementation is the coordinate map Phi:
+
+    Phi(a + bI) = (a, a + b).
+
+Its inverse is
+
+    Phi^-1(u, v) = u + (v - u)I.
+
+Under this map, neutrosophic addition and multiplication become ordinary coordinate-wise operations. For example,
+
+    Phi((a + bI)(c + dI)) = (ac, (a + b)(c + d)).
+
+The code can therefore carry out two ordinary integer calculations and join the answers again. This is used for multiplication, coprimality, the special phi-Euler function, modular powers, modular inverses, RSA and Diffie-Hellman. It is not an approximation. It follows from the ring isomorphism stated in the assignment brief [1].
+
+
+3. Part A: arithmetic implementation
+
+The NeutrosophicInt structure stores the two coefficients a and b directly. It provides methods for all the required operations. The methods toCoords and fromCoords move between the displayed a + bI form and the coordinate pair (a, a + b).
+
+3.1 Addition and multiplication
+
+The add method adds the two stored coefficients. The mul method uses the coordinate form. It calculates ac for the first coordinate and (a + b)(c + d) for the second coordinate. It then subtracts the first from the second to recover the coefficient of I. Thus, the code follows the stated multiplication formula without having to handle four separate product terms every time.
+
+3.2 Coprimality
+
+The assignment defines two neutrosophic integers as coprime when both coordinate pairs are coprime. For A = a + bI and B = c + dI, the condition is
+
+    gcd(a, c) = 1 and gcd(a + b, c + d) = 1.
+
+The isCoprime method returns true only when both conditions hold. The ordinaryGcd helper uses the Euclidean algorithm. Negative inputs are first changed to their absolute values.
+
+3.3 Special phi-Euler function
+
+For X = x + yI, the special function is
+
+    phi_s(X) = phi(x) + [phi(x + y) - phi(x)]I.
+
+The phiS method finds the ordinary Euler totient on both coordinates and then uses fromCoords to rebuild the neutrosophic answer. The ordinary phiPlain function uses trial division, which is suitable for the small unit-test inputs.
+
+Trial division would be too slow for the large RSA factors. In that part of the program the factors are already known to be prime. For a neutrosophic prime P = a + bI, the two prime coordinates are a and a + b, so
+
+    phi_s(P) = (a - 1) + bI.
+
+The phiSFromPrimes helper applies this fact to the two known RSA factors and multiplies their phi values. This avoids trying to factor a large RSA modulus again.
+
+3.4 Modular exponentiation
+
+The powMod method uses the exponent as a neutrosophic integer as required. If the base is X = x + yI and the exponent is E = e1 + e2I, then the two calculations are
+
+    x^e1 mod m1
+
+and
+
+    (x + y)^(e1 + e2) mod m2.
+
+The ordinary helper powModPlain uses square-and-multiply. It does not call GMP's ready-made modular-power function. Each loop squares the base, and it multiplies the result only when the current exponent bit is odd. This keeps the number of multiplications proportional to the bit length of the exponent.
+
+3.5 Modular inverse
+
+The invMod method finds one ordinary inverse in each coordinate. The ordinaryModInv helper uses the Extended Euclidean Algorithm (EEA). It first reduces a negative input to its positive residue. If the greatest common divisor is not 1, no inverse exists and the method returns false. Otherwise, the two coordinate inverses are joined with fromCoords.
+
+This return value matters because an inverse should never be used after a failed calculation. RSA key generation also checks it. If the chosen public exponent has no inverse for a generated phi value, key generation starts again.
+
+3.6 Verification of Part A
+
+The test block prints 22 passing checks. It covers the coordinate map, addition, multiplication, coprimality, phi_s, modular exponentiation, modular inversion and an RSA encrypt-decrypt round trip. Each required operation has a paper-based example where one is available and an independently constructed example. Some of the independent checks are:
+
+    (4 - 3I) + (1 + 5I) = 5 + 2I
+    (2 + I)(4 - I) = 8 + I
+    phi_s(8 + 7I) = 4 + 4I
+    (2 + I)^(4 + I) mod (11 + 2I) = 5 + 4I
+    (2 + 3I)^-1 mod (9 + 4I) = 5 + 3I
+
+The inverse tests also multiply a value by its calculated inverse and check that both coordinates reduce to 1. The small examples make manual checking possible. GMP's mpz_class has no fixed machine-word limit, so the same representation can hold the required 256-bit values. Part B exercises the large-number multiplication, coprimality, modular-power and modular-inverse paths. The general phiS test uses small values because phiPlain uses trial division; RSA key generation uses the faster known-prime formula instead.
+
+3.7 Note about the second RSA example in the paper
+
+The second worked RSA example in the supplied paper [2] contains an internal arithmetic inconsistency. It states that
+
+    (7 + 4I)(13 + 6I) = 91 + 116I.
+
+Direct multiplication gives
+
+    ac = 7 x 13 = 91,
+    ad + bc + bd = 7 x 6 + 4 x 13 + 4 x 6 = 118.
+
+Therefore, the product is 91 + 118I. The coordinate check gives the same answer:
+
+    Phi(7 + 4I) = (7, 11),
+    Phi(13 + 6I) = (13, 19),
+    (7, 11)(13, 19) = (91, 209),
+    Phi^-1(91, 209) = 91 + 118I.
+
+The paper later uses values from more than one example in its decryption line. I treated this as an error in the worked example. With the corrected modulus 91 + 118I, the stated message and exponent produce 32 - 24I, not 32 + 138I. The paper's stated modular exponentiation and inverse values are still included as comparison tests on the moduli printed in the paper, because the assignment asks for paper-based tests. However, the multiplication method and the actual RSA key generator use the formula above. They do not change the arithmetic to force the incorrect coefficient 116.
+
+
+4. Part B: keys and public parameters
+
+4.1 Threat model
+
+Alice and Bob want to agree on a shared value while Eve can read, block, replay and replace messages on the channel. Before the exchange begins, Alice already has Bob's trusted long-term RSA public key, and Bob already has Alice's. This trusted distribution is an assumption from the assignment [1]. The protocol does not explain how the initial public keys are certified or exchanged.
+
+Without authentication, Eve could replace Alice's Diffie-Hellman public value with her own and do the same to Bob. She could then form one secret with Alice and another with Bob. In the assignment's model, RSA signatures make these replacement attempts fail. The receiver checks a message with the expected sender's trusted public key, not with a key supplied beside the message.
+
+4.2 Generation of the Diffie-Hellman group
+
+The public Diffie-Hellman modulus is a neutrosophic prime P_DH. Its two coordinates p1 and p2 are different 256-bit safe primes. A safe prime has the form
+
+    p = 2q + 1,
+
+where q is also prime. Knowing this factorisation makes it practical to test a generator. Since the multiplicative group modulo p has order p - 1 = 2q, an element's order can only divide 2q. The proper possibilities are 1, 2 and q. A candidate g has full order when
+
+    g^q mod p != 1
+
+and
+
+    g^2 mod p != 1.
+
+These two checks rule out the smaller orders, leaving 2q = p - 1. The program finds a primitive root separately for p1 and p2. If they are g1 and g2, the neutrosophic generator is
+
+    G = g1 + (g2 - g1)I,
+
+so Phi(G) = (g1, g2). Each coordinate has full order in its own group. The order of the combined G is the least common multiple (lcm) of p1 - 1 and p2 - 1, and the program prints this value.
+
+The areDhParametersValid function checks the public parameters before any exchange. It confirms that the stored and reconstructed modulus coordinates agree, p1 and p2 are different, p1 and p2 are at least 256 bits, each p is 2q + 1, all four p and q values are prime, and both generator coordinates have full order. A generator such as 1 + 0I is rejected.
+
+4.3 Neutrosophic RSA keys and signatures
+
+Alice, Bob and Eve each receive a separate long-term RSA key pair. For each pair, the program generates two neutrosophic primes P_RSA and Q_RSA. Every coordinate of these factors is a 257-bit probable prime. Q_RSA is regenerated until its corresponding coordinates are coprime with those of P_RSA. The modulus and phi value are
+
+    N = P_RSA Q_RSA,
+    phi_s(N) = phi_s(P_RSA) phi_s(Q_RSA).
+
+The public exponent is fixed as
+
+    E = 65537 + 0I.
+
+In coordinates this is (65537, 65537). The private exponent D is the neutrosophic modular inverse of E modulo phi_s(N). The public key is (E, N), while D remains private. The RSA terminology follows the general description in PKCS #1 [3], though this coursework code does not implement a PKCS #1 signature scheme.
+
+For a Diffie-Hellman public value M, the signature and verification calculations are
+
+    S = M^D mod N,
+    S^E mod N == M.
+
+The program signs the NeutrosophicInt value directly. There is no hash or byte serialisation layer. Before RSA verification, the receiver also checks both coordinates of M. Values at or below 1, values at or above p - 1, and values outside the group range are rejected. This check is needed because the pair M = 1 + 0I and S = 1 + 0I would otherwise satisfy raw RSA verification for any exponent.
+
+
+5. Protocol specification
+
+The notation below separates the Diffie-Hellman and RSA values:
+
+    P_DH, G            public Diffie-Hellman parameters
+    A                   Alice's fresh neutrosophic secret exponent
+    A_pub               Alice's Diffie-Hellman public value
+    B                   Bob's fresh neutrosophic secret exponent
+    B_pub               Bob's Diffie-Hellman public value
+    (E_A, N_A), D_A     Alice's RSA public and private values
+    (E_B, N_B), D_B     Bob's RSA public and private values
+    S_A, S_B            RSA signatures
+
+Precondition. Alice trusts (E_B, N_B), and Bob trusts (E_A, N_A). Both sides have the same P_DH and G. They first run the full parameter validation described above. If it fails, the exchange stops.
+
+Step 1: Alice creates and signs her public value.
+
+Alice chooses a fresh secret A and calculates
+
+    A_pub = G^A mod P_DH.
+
+She signs this value with her long-term RSA private exponent:
+
+    S_A = A_pub^D_A mod N_A.
+
+She sends the pair (A_pub, S_A) towards Bob.
+
+Step 2: Bob authenticates Alice and replies.
+
+Bob first checks that both coordinates of A_pub are acceptable group values. He then uses Alice's trusted public key to calculate
+
+    S_A^E_A mod N_A.
+
+He accepts only if this result equals A_pub. If Eve changed A_pub, kept an unrelated signature or signed with Eve's own key, the equality fails and Bob stops before deriving a key. After accepting Alice's message, Bob chooses a fresh secret B and calculates
+
+    B_pub = G^B mod P_DH,
+    S_B = B_pub^D_B mod N_B.
+
+He sends (B_pub, S_B) towards Alice.
+
+Step 3: Alice authenticates Bob.
+
+Alice applies the same group-range check to B_pub. She verifies S_B using Bob's trusted public key. She stops if
+
+    S_B^E_B mod N_B != B_pub.
+
+This is the check used against Eve's own-key substitution in Case 6.
+
+Step 4: Both sides derive the shared value.
+
+Only after successful verification does each side calculate a key:
+
+    K_A = B_pub^A mod P_DH,
+    K_B = A_pub^B mod P_DH.
+
+For an honest exchange, both are G^(AB) mod P_DH. In the two coordinates, the exponents are ordinary integer products and multiplication commutes. Therefore, K_A = K_B. The program compares and prints the two full neutrosophic values.
+
+The deliver function represents the hostile channel. Eve's behaviour changes according to the selected demonstration, but she never receives Alice's or Bob's private exponent from the program.
+
+
+6. Demonstration results
+
+6.1 Case 1: clean exchange
+
+Eve does not alter either message. The parameter checks pass. Bob verifies Alice's signature, and Alice verifies Bob's. They independently calculate exactly the same neutrosophic shared value.
+
+6.2 Case 2: Eve replaces Alice's value but keeps Alice's signature
+
+Eve substitutes her own Diffie-Hellman public value while forwarding Alice's original signature. Bob verifies the received value against that signature. Since Alice signed a different value, the check fails at Step 2. Bob stops and no shared key is created.
+
+6.3 Case 3: Eve signs her own value with her own key
+
+Here Eve sends her own Diffie-Hellman value and a mathematically valid signature made with Eve's private key. Bob does not use Eve's public key. He uses Alice's trusted public key because the message is supposed to be from Alice. Verification again fails at Step 2. This case shows why a valid signature is not enough by itself. It must verify under the expected identity's key.
+
+6.4 Case 4: Eve replays an old signed value from Alice
+
+Eve records a genuine pair (A_pub_old, S_A_old) from an earlier session. During a later run, she replaces Alice's fresh pair with the old pair. Bob's signature check passes because Alice really did sign that old value. Bob then sends a new, correctly signed reply, which Alice accepts.
+
+The final keys differ in the recorded run. Bob combines his fresh secret with Alice's old public value, while Alice combines her fresh secret with Bob's new public value. Eve still does not learn Alice's or Bob's private secret, so this demonstration does not reveal either shared value to her. However, the protocol has accepted an old message as authentic and the session is disrupted. Authentication proves who signed a value, but it does not prove when or for which session it was signed.
+
+The signed data needs a fresh session value. For example, Alice could sign her role, the parameters, A_pub and a fresh nonce. Bob's reply could bind both identities, both public values, the same parameters and that nonce. The current implementation intentionally leaves these fields out because the assignment design signs the Diffie-Hellman value directly. The replay result must therefore be reported as a limitation, not as a successful defence.
+
+6.5 Case 5: Eve flips one bit
+
+Eve changes one bit of Alice's public value and leaves the signature unchanged. Even this small change means the received value is not the value Alice signed. Bob rejects it at Step 2 and creates no key.
+
+6.6 Case 6: Eve pretends to be Bob
+
+Alice's first message reaches Bob and passes verification. Eve then replaces Bob's return message with Eve's own value and Eve's own signature. Alice checks it with Bob's trusted public key. The verification fails at Step 3, so Alice stops without deriving a key from Eve's value.
+
+6.7 Case 7: Eve replaces the generator with 1
+
+Before the exchange, Eve changes G to 1 + 0I. Raising 1 to any exponent would always give 1, so accepting this value would destroy the intended Diffie-Hellman behaviour. The parameter validator detects that the generator coordinates do not have full order. Both parties reject the parameters before sending any public value.
+
+
+7. Security analysis
+
+7.1 Why the tested substitutions fail
+
+A standard unauthenticated Diffie-Hellman exchange does not show whether a public value came from Alice, Bob or Eve. In this design, each public value is tied to a long-term RSA private key. The protocol argument assumes that Eve cannot forge a signature under Alice's or Bob's key. It also assumes that she cannot recover a Diffie-Hellman secret from the public values. Under those assumptions, the four demonstrated message replacements fail at the expected public-key check. The later limitations explain why this raw RSA implementation does not provide the same assurance as a standard signature scheme.
+
+The exact failure point is the receiver's verification gate. An attack on Alice's outgoing value fails when Bob checks S_A with (E_A, N_A). An attack on Bob's outgoing value fails when Alice checks S_B with (E_B, N_B). The program does not calculate a shared value after a failed gate. Cases 2, 3, 5 and 6 demonstrate these failures. Case 7 stops even earlier during public-parameter validation.
+
+This argument depends on the public keys being trusted in advance. If Eve could replace Alice's stored RSA public key with her own, Bob could be fooled into accepting Eve's signatures as Alice's. Public-key certification is outside the assignment, so the report keeps the stated trusted-channel assumption.
+
+7.2 What the demonstrations show
+
+These seven tests show what this program does in the selected attacks. The honest calculations agree. The program detects changed signed values, rejects a signature from the wrong identity, and rejects one trivial generator attack. These results do not prove that the code can replace a reviewed cryptographic library.
+
+In the clean run, verification raises each received signature to the sender's public exponent and compares the recovered value with the displayed Diffie-Hellman public value. The console prints "It matches" instead of printing that same large value for a second time. The partyVerifyMessage function performs the equality check before key calculation.
+
+The source also validates a received Diffie-Hellman public value before applying RSA verification. This blocks 0, 1, p - 1 and out-of-range coordinates. In particular, it blocks the simple raw-RSA pair value = 1 and signature = 1.
+
+7.3 Limits of the implementation
+
+Fixed random seed. The GMP Mersenne Twister is seeded with the fixed decimal value 12345678901234567890. This makes every run repeatable, which is useful when the output must be checked and placed in a report. It also makes every generated RSA factor and Diffie-Hellman secret predictable. A real system must use fresh random values from a cryptographically secure operating-system source. The fixed-seed version must never be used to protect actual data.
+
+Replay and missing freshness. The signed message contains only the Diffie-Hellman public value. It has no nonce, timestamp, session identifier, role name or transcript hash. For this reason, an old genuine signature remains valid. Case 4 demonstrates the result. The two-message repair described in Section 6.4 would bind each value to its sender, role, parameters and current session.
+
+Raw textbook RSA. The code applies RSA exponentiation directly to the neutrosophic message. It does not hash the message and does not use a standard padding or encoding method. Raw RSA is deterministic and has algebraic properties that standard signature schemes are designed to avoid. RFC 8017 describes the RSA Signature Scheme with Appendix - Probabilistic Signature Scheme (RSASSA-PSS), which has a defined message encoding [3]. The range check removes the particular 1 + 0I shortcut from the accepted DH messages, but it does not turn textbook RSA into a production signature scheme.
+
+Small cryptographic sizes. The assignment requires values of at least 256 bits, and the program meets that requirement. Its two Diffie-Hellman prime coordinates are 256 bits. Each RSA modulus coordinate is the product of two 257-bit primes, so it is about 514 bits. These sizes are far below modern practical choices. For comparison, National Institute of Standards and Technology (NIST) guidance maps even 112-bit security to 2048-bit finite-field and integer-factorisation public-key parameters [5]. The sizes used here are suitable for completing the assignment quickly, not for long-term protection.
+
+Parameter authenticity. The validator checks whether the parameters have the required mathematical form, but it does not prove who supplied them. It rejects G = 1 and other invalid choices. A real protocol should also bind the group parameters to a trusted configuration or include them in an authenticated transcript.
+
+No key confirmation or derivation step. The program compares the two raw Diffie-Hellman results because Alice and Bob are structures inside one process. Two parties on a real network could not make this direct comparison. They would need an authenticated key-confirmation message. A practical system would also pass the shared value and the session transcript through a key derivation function (KDF) before using it as a symmetric encryption key.
+
+Implementation hardening. The hand-written algorithms are useful for showing the mathematics. They were not written as constant-time code and were not reviewed for resistance to timing, power or cache side channels. Established cryptographic libraries are the proper choice outside this coursework setting.
+
+These limits do not prevent the program from meeting the stated arithmetic and demonstration requirements. They do limit the security claim. The signed messages stop the replacement attacks tested here under the assignment's assumptions. Replay is still possible, and production use would need standard cryptographic schemes.
+
+
+8. Build and execution instructions
+
+Required software:
+
+    1. A C++ compiler with C++17 support, such as g++.
+    2. GMP with its C++ wrapper library. On Debian or Ubuntu, the package is commonly named libgmp-dev.
+
+Compile from the directory containing dhke.cpp:
+
+    g++ -std=c++17 -O2 -Wall -Wextra -Wpedantic dhke.cpp -lgmpxx -lgmp -o dhke
+
+Run the program:
+
+    ./dhke
+
+The program first runs all Part A checks and then performs the seven Part B demonstrations. It prints complete decimal values rather than shortened hashes. Because the random seed is fixed, repeated runs produce the same transcript. If any Part A check fails, the program returns a non-zero exit status.
+
+The submitted source was also compiled with AddressSanitizer and UndefinedBehaviourSanitizer during testing. No sanitizer finding was produced. These tools help detect certain memory and undefined-behaviour errors, but they are not a proof of cryptographic security.
+
+
+9. Conclusion
+
+The coordinate map makes the assignment manageable. Each neutrosophic operation becomes two ordinary large-integer operations, and fromCoords changes the pair back into a + bI form. Part A confirms this design with 22 passing checks. Part B uses the same operations for prime generation, generator testing, RSA signatures and Diffie-Hellman shared-value calculation.
+
+In the clean run, Alice and Bob obtain identical values. Eve's changed values fail at Bob's or Alice's signature-verification step because the trusted key does not match Eve's signature. The replay run gives a more careful result: the old signature is genuine, so it passes, but the session has no freshness protection and the two displayed keys differ. The implementation therefore demonstrates the required authenticated exchange and also shows where its coursework design stops being sufficient for a real system.
+
+
+10. References
+
+[1] SIL7159: Cryptography and Cryptanalysis, Assignment 2 handout, 2026.
+
+[2] M. Merkepci, M. Abobala and A. Allouf, "The Applications of Fusion Neutrosophic Number Theory in Public Key Cryptography and the Improvement of RSA Algorithm," Fusion: Practice and Applications, Vol. 10, No. 02, pp. 69-74, 2023. DOI: https://doi.org/10.54216/FPA.100206
+
+[3] K. Moriarty, B. Kaliski, J. Jonsson and A. Rusch, "PKCS #1: RSA Cryptography Specifications Version 2.2," RFC 8017, November 2016. https://www.rfc-editor.org/rfc/rfc8017.html
+
+[4] GNU Project, "GNU MP 6.3.0 Manual: C++ Interface Integers." https://gmplib.org/manual/C_002b_002b-Interface-Integers
+
+[5] E. Barker, "Recommendation for Key Management: Part 1 - General," NIST Special Publication 800-57 Part 1 Revision 5, May 2020. https://doi.org/10.6028/NIST.SP.800-57pt1r5
+
+Accessed 6 September 2026.
+
+
+Appendix A: complete console output
+
+The following transcript is the complete deterministic output produced by the reviewed dhke.cpp build.
+
+***** PART A tests *****
+PASS A.1 toCoords: 3+2I -> (3,5)
+PASS A.1 fromCoords: (7,12) -> 7+5I
+PASS A.2 add: (3+2I)+(5+6I) = 8+8I
+PASS A.2 add: (4-3I)+(1+5I) = 5+2I
+PASS A.3 mul: (3+2I)(5+6I) = 15+40I
+PASS A.3 mul: (3+2I)(7+4I) = 21+34I
+PASS A.3 mul: (2+I)(4-I) = 8+I
+PASS A.4 isCoprime: (3+2I, 7+4I) coprime
+PASS A.4 isCoprime: (2+2I, 4+4I) not coprime
+PASS A.5 phiS: phiS(15+40I) = 8+32I
+PASS A.5 phiS: phiS(21+34I) = 12+28I
+PASS A.5 phiS: same answer via the prime factors of 15+40I
+PASS A.5 phiS: phiS(8+7I) = 4+4I
+PASS A.6 powMod: (3+3I)^(5+6I) mod (21+34I) = 12-6I
+PASS A.6 powMod: (2+6I)^(17+14I) mod (91+116I) = 32+138I
+PASS A.6 powMod: (2+I)^(4+I) mod (11+2I) = 5+4I
+PASS A.7 invMod: (5+6I)^-1 mod (12+28I) = 5+6I
+PASS A.7 invMod: (17+14I)^-1 mod (72+108I) = 17+134I
+PASS A.7 invMod: (2+3I)^-1 mod (9+4I) = 5+3I
+PASS A.7 invMod: (5+6I) times its inverse gives 1 in both coordinates
+PASS A.7 invMod: (2+3I) times its inverse gives 1 in both coordinates
+PASS RSA round-trip: decrypt(encrypt(3+3I)) = 3+3I
+All Part A tests passed
+
+***** PART B (Authenticated DHKE) *****
+Generating RSA key pairs for Alice, Bob, and Eve along with the shared DH group
+DH public parameters:
+P = 103327964873096419674724912443338006129348299095532170537939791803345825591919 + (-17717598310720589492490089538408736952394064694519637009226151211350982396672)I
+Both coordinates of P are 256 bit safe primes p = 2q + 1
+
+Finding a generator for the first coordinate p = 103327964873096419674724912443338006129348299095532170537939791803345825591919:
+ try g = 13
+ g^((p-1)/2) mod p = 103327964873096419674724912443338006129348299095532170537939791803345825591918
+ g^((p-1)/q) mod p = 169
+ Neither result is 1, so 13 generates the units mod p.
+By the same test the second coordinate accepts g = 5
+
+G = 13 + (-8)I
+ord(G) = lcm(a-1, a+b-1) = 4422972474465039034095598883984675994928612225880063851765478780293200936917407348661689946031819597387836873766023202927781948363555923974468771196810914
+
+-----CASE 1: Clean handshake without Eve on the line-----
+
+Parameter check passed because both modulus coordinates are safe primes and both generator coordinates have full order
+
+Step 1: First Alice picks a fresh secret, computes her DH public value and then signs it with her RSA key
+ DH public value = 2947208229522358746302282525201141340352519462241911231305330312486816304420 + (69543713698743025137763156316000299499560106852160022822629523650253336007808)I
+ signature = 5895451253482771212000347774770540585617662926001196186604111924195724956900393534342084479682817092815367487593758265986124122845515238807704364069896463 + (14771039531395822550944385711599305566832322516743212717153015938922224029944574925423991591512730934007168913385841040769234465801198169321014985371991886)I
+
+Step 2: Bob checks the signature against Alice's long term public key (which he already trusts)
+It matches therefore this DH public value really is Alice's
+Bob answers with his own signed DH public value.
+ DH public value = 13200711005904914847304654592020879261695769650709441526026747497720553575970 + (-11015317933454371022814067747638534240508555576691882378880663028934656565401)I
+ signature = 28481478797601949398776504261375122112767835667138592037185155783499226494762876702686828427457187535242508708841906826375238561806393638462071211851053952 + (-2204336791050167656422877451287289232631483529092068132669450284600686299952605638624101326753976800629338414748888742988349155378325930860566587072523527)I
+
+Step 3: Alice checks Bob's signature the same way
+ It matches therefore the DH public value really is Bob's.
+
+Step 4: Each side derives the shared key on their own
+ Alice gets 28627578326786011064077734206933583717881400913717216140402831467273048430004 + (52773312882937544351715902866107062168305940760462824048725610625998969397312)I
+ And Bob gets 28627578326786011064077734206933583717881400913717216140402831467273048430004 + (52773312882937544351715902866107062168305940760462824048725610625998969397312)I
+Both the keys are identical so agreement succeeded
+
+-----CASE 2: Eve swaps her own DH public value in but keeps Alice's signature-----
+
+Parameter check passed because both modulus coordinates are safe primes and both generator coordinates have full order
+
+Step 1: First Alice picks a fresh secret, computes her DH public value and then signs it with her RSA key
+ DH public value = 22425336205746956565459747792584652053880586077888447164966044945149191529808 + (62557568281190507737825474495370040828757768086231044492346847568413166448730)I
+ signature = 23532292134318225597394663108721034410196972826979098524707085604296129068977847166846243634760369784619183894369421067041842125929137735176187531705462553 + (-11243710939652788399630405236610447006685511686628613022720785499261858272422984462824755208108267608910423016409285366831538320499714679159650386742877999)I
+Eve replaces Alice's DH public value with her own but keeps Alice's signature
+
+Step 2: Bob checks the signature against Alice's long term public key (which he already trusts)
+The signature or DH public value is invalid so Bob stops here and no key is created
+
+-----CASE 3: Eve signs her own DH public value with her own key-----
+
+Parameter check passed because both modulus coordinates are safe primes and both generator coordinates have full order
+
+Step 1: First Alice picks a fresh secret, computes her DH public value and then signs it with her RSA key
+ DH public value = 37701721062742318584666328399003989495192130299074323004698614612579277889221 + (42850793752066603447511392740972111693946927649365462842894287764263696780483)I
+ signature = 25960388315700243356763416110020523012432337859156533030242100124896772789853089883630794033022054539152120631889747574918403176004787041894402345207105411 + (-13427503900111521368116619260551136499582344781831682973451562245000237184752016130471340760030286444149247253983052214400659561144032461470199006502340358)I
+Eve replaces Alice's DH public value with her own and signs it with her own RSA key
+
+Step 2: Bob checks the signature against Alice's long term public key (which he already trusts)
+The signature or DH public value is invalid so Bob stops here and no key is created
+
+-----CASE 4: Eve replays an old signed DH public value from Alice-----
+
+Parameter check passed because both modulus coordinates are safe primes and both generator coordinates have full order
+Before this run Eve managed to record one of Alice's old signed DH public values from an earlier session
+
+Step 1: First Alice picks a fresh secret, computes her DH public value and then signs it with her RSA key
+ DH public value = 22785444678046486881115271083455536548182165060235355169312316278607833025826 + (26872235597959045852061378619663573402834903050608792898965038707098445278521)I
+ signature = 15160641274371802893589600183971262807780930273767691689015476653932470420312068990005335344060814096569563657937811113864718840450299887598921642713159497 + (4543404418981316680086767428994211344348746970015584737872018961612832356194777351805539580966507055908835028977090326269721643024563579926877100567821813)I
+Eve replays the old DH public value and signature she recorded. The signature is genuine so this one passes the gate
+
+Step 2: Bob checks the signature against Alice's long term public key (which he already trusts)
+It matches therefore this DH public value really is Alice's
+Bob answers with his own signed DH public value.
+ DH public value = 21745226637172529453887833964462950462944227362559931268817556530750037410176 + (-9829340090364544085859396163189987014363457365991991638366931743116071061412)I
+ signature = 39136628359143139023287144718771342446839416706167372393222345037939600734151631591271996688330835324207454144494933856673877862763154560784020161916518570 + (-30013580762004883939637631539274448556551408508154176006900652122526994570815267410372336122668305829427952638330221158421075369925161497448926872811742337)I
+
+Step 3: Alice checks Bob's signature the same way
+ It matches therefore the DH public value really is Bob's.
+
+Step 4: Each side derives the shared key on their own
+ Alice gets 50014976630634980818519260243182674802194165532039352774101724776017990563217 + (-18412130253963996858442648943289323417250200212796789601504386318121033140462)I
+ And Bob gets 16769464046635250375789691194318934158824716286698468074709204978433133304421 + (-10065061145466334267872808435985380328576038850306365345720551671700875577896)I
+The keys differ.
+Bob used Alice's old DH public value while Alice used Bob's new value. In this run, those two calculations produce different keys
+Eve still cannot calculate either key because she knows neither secret. However, the replay is accepted as authentic and disrupts the session because the messages have no freshness check
+
+-----CASE 5: Eve flips one bit of Alice's DH public value-----
+
+Parameter check passed because both modulus coordinates are safe primes and both generator coordinates have full order
+
+Step 1: First Alice picks a fresh secret, computes her DH public value and then signs it with her RSA key
+ DH public value = 18111166745997998311130607210470499001305094602375442145800544994059444139917 + (34774234399029613865924191476294162191296906582238571014071408734304104910651)I
+ signature = 14177356644053738544134988492647584431851455082687458939189408257034556087253384332759998792370068989829143779532969905666792940461346344732182616428782044 + (-4753182312922988972105885259510112141426863227028289200684436077718593690505522315649722103517301839322351405071306732112981066999904479492697877381962466)I
+Eve passes along the message but flips one bit of Alice's DH public value first.
+
+Step 2: Bob checks the signature against Alice's long term public key (which he already trusts)
+The signature or DH public value is invalid so Bob stops here and no key is created
+
+-----CASE 6: Eve answers Alice pretending to be Bob-----
+
+Parameter check passed because both modulus coordinates are safe primes and both generator coordinates have full order
+
+Step 1: First Alice picks a fresh secret, computes her DH public value and then signs it with her RSA key
+ DH public value = 88617629343198616208502937944538532971579098777431608783036899382208931604053 + (-25828541101663303115955254012952503501214379822708914990815986551400577687388)I
+ signature = 33586082483841850439592565671196980047469700370570539835066914441917770104985063049719221712342954259139320607445341282550242578829781718647604737639958380 + (-7384566301528978177365313717951890861936741219785169440217321977535403012029229967878246930669612788142676102051048175833354335435126197801638838136942591)I
+
+Step 2: Bob checks the signature against Alice's long term public key (which he already trusts)
+It matches therefore this DH public value really is Alice's
+Bob answers with his own signed DH public value.
+ DH public value = 75831102672393950072143736627934668931272695708539015522691340270673461435773 + (-65322190568463443470827814211837461678426841150501489683059600024159660514176)I
+ signature = 18621935526486922276371075349980286764913926816242117502245117280377642137229900518789941870802135326364623536315320504015156661845393795037060861243734563 + (-4244459012735056397863345502659948169416018009733671373860760359568111468002618662220169392364831286912979111993239885348262171646256776607924581042704443)I
+Eve pretends to be Bob using her own DH public value signed with her own key
+
+Step 3: Alice checks Bob's signature the same way
+ The signature or DH public value is invalid therefore Alice stops and no key is created
+
+-----CASE 7: Eve replaces the shared generator with 1-----
+
+Eve gets to the shared parameters first and then replaces the generator with 1 + 0I
+The DH parameters are invalid therefore both sides reject the parameters and the protocol stops before exchange begins
