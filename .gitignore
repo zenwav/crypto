@@ -1,0 +1,6 @@
+# Compiled binaries
+assignment2
+*.o
+
+# Platform workspace metadata
+.hoplite/

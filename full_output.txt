@@ -1,0 +1,171 @@
+==================== PART A : unit tests ====================
+PASS  A.1 to_coords: 3+2I -> (3,5)
+PASS  A.1 from_coords: (7,12) -> 7+5I
+PASS  A.2 add: (3+2I)+(5+6I) = 8+8I
+PASS  A.2 add: (4-3I)+(1+5I) = 5+2I
+PASS  A.3 mul: (3+2I)(5+6I) = 15+40I  [paper]
+PASS  A.3 mul: (3+2I)(7+4I) = 21+34I  [paper]
+PASS  A.4 isCoprime: (3+2I, 7+4I) coprime  [paper]
+PASS  A.4 isCoprime: (2+2I, 4+4I) NOT coprime
+PASS  A.5 phiS: phiS(15+40I) = 8+32I  [paper]
+PASS  A.5 phiS: phiS(21+34I) = 12+28I  [paper]
+PASS  A.5 phiS: multiplicativity agrees with definition
+PASS  A.6 powmod: (3+3I)^(5+6I) mod (21+34I) = 12-6I  [paper]
+PASS  A.6 powmod: (2+6I)^(17+14I) mod (91+116I) = 32+138I  [paper]
+PASS  A.7 invMod: (5+6I)^-1 mod (12+28I) = 5+6I  [paper]
+PASS  A.7 invMod: (17+14I)^-1 mod (72+108I) = 17+134I  [paper]
+PASS  A.7 invMod: E * E^-1 == 1 (mod phiN) round-trip
+PASS  RSA toy: decrypt(encrypt(3+3I)) = 3+3I  [paper]
+All Part A tests passed.
+
+==================== PART B : authenticated DHKE ====================
+Generating long-term neutrosophic RSA key pairs (257-bit primes)
+for Alice, Bob and Eve, and the 256-bit safe-prime DH group...
+(This is the slow part -- hunting four safe primes.)
+
+DH public parameters:
+  neutrosophic modulus P   = 103007254361409947529281259249467338322881397281212800788186459361404740475859 + (10367512205376885636920483245976937252577552648481741780191998147994071121644)I   [both coordinates 256-bit primes]
+  generator G              = 2 + (3)I
+  (G's coordinates 2 and 5 are primitive roots of the two tracks)
+  check: g1^((a-1)/2) mod a   = 103007254361409947529281259249467338322881397281212800788186459361404740475858  (must be != 1)
+  check: g1^((a-1)/q1) mod a  = 4  (must be != 1)
+  order of G = lcm(a-1, a+b-1) (both tracks generate fully)
+
+------------------------------------------------------------
+RUN 1 -- honest channel (no Eve): correctness
+------------------------------------------------------------
+  Parameter check OK: both generator coordinates exceed 1.
+
+  Step 1  Alice picks a fresh secret and sends her DH public value
+          together with her RSA signature on it.
+          Alice's DH public value: (8493fed9c4ad..., 645256471818...)  [256 & 251 bits]
+
+  Step 2  Bob verifies the signature against ALICE's trusted
+          long-term public key...
+          Signature valid: the value really came from Alice.
+          Bob replies with his own signed DH public value.
+          Bob's DH public value:   (a130b8788325..., ae98354d789e...)  [256 & 252 bits]
+
+  Step 3  Alice verifies the signature against BOB's trusted
+          long-term public key...
+          Signature valid: the value really came from Bob.
+
+  Step 4  Both sides derive the shared key independently:
+          Alice's key: (4f2a41a63f30..., c61df456509a...)  [255 & 252 bits]
+          Bob's key:   (4f2a41a63f30..., c61df456509a...)  [255 & 252 bits]
+          The two keys MATCH -- agreement succeeded.
+
+------------------------------------------------------------
+RUN 2 -- Eve forwards her own value with Alice's signature
+------------------------------------------------------------
+  Parameter check OK: both generator coordinates exceed 1.
+
+  Step 1  Alice picks a fresh secret and sends her DH public value
+          together with her RSA signature on it.
+          Alice's DH public value: (438a87ca57fe..., 8916f3eaca89...)  [255 & 256 bits]
+  [Eve] swaps in her own DH public value but forwards Alice's
+  [Eve] signature unchanged (she cannot make a new one as Alice).
+
+  Step 2  Bob verifies the signature against ALICE's trusted
+          long-term public key...
+          VERIFICATION FAILED. Bob aborts; no key is created.
+
+------------------------------------------------------------
+RUN 3 -- Eve signs her own value with her OWN key
+------------------------------------------------------------
+  Parameter check OK: both generator coordinates exceed 1.
+
+  Step 1  Alice picks a fresh secret and sends her DH public value
+          together with her RSA signature on it.
+          Alice's DH public value: (5149b103382b..., 863d594197af...)  [255 & 256 bits]
+  [Eve] swaps in her own DH public value and signs it with her
+  [Eve] OWN RSA key (a valid signature, but not Alice's).
+
+  Step 2  Bob verifies the signature against ALICE's trusted
+          long-term public key...
+          VERIFICATION FAILED. Bob aborts; no key is created.
+
+------------------------------------------------------------
+RUN 4 -- Eve replays an old genuine message
+------------------------------------------------------------
+  Parameter check OK: both generator coordinates exceed 1.
+  [setup] Eve recorded a genuine signed value from Alice's
+  [setup] previous session.
+
+  Step 1  Alice picks a fresh secret and sends her DH public value
+          together with her RSA signature on it.
+          Alice's DH public value: (68dc8e329627..., dbaf1ebccae0...)  [255 & 252 bits]
+  [Eve] replays Alice's OLD (value, signature) pair from a
+  [Eve] previous session. The signature is genuine!
+
+  Step 2  Bob verifies the signature against ALICE's trusted
+          long-term public key...
+          Signature valid: the value really came from Alice.
+          Bob replies with his own signed DH public value.
+          Bob's DH public value:   (1307c84b8675..., 6b99be050514...)  [253 & 255 bits]
+
+  Step 3  Alice verifies the signature against BOB's trusted
+          long-term public key...
+          Signature valid: the value really came from Bob.
+
+  Step 4  Both sides derive the shared key independently:
+          Alice's key: (3022e6113e82..., 7726a0e627db...)  [254 & 255 bits]
+          Bob's key:   (90e6cbba4e0e..., 70220505ce92...)  [256 & 255 bits]
+          Keys DO NOT match.
+          Expected here: Bob derived his key from Alice's OLD
+          replayed value, Alice from Bob's FRESH value. Eve gained
+          nothing (she knows neither secret, so she cannot
+          compute either key), but the session is desynchronised:
+          a replay cannot break confidentiality, it can only
+          disrupt the run.
+
+------------------------------------------------------------
+RUN 5 -- Eve flips one bit of Alice's public value
+------------------------------------------------------------
+  Parameter check OK: both generator coordinates exceed 1.
+
+  Step 1  Alice picks a fresh secret and sends her DH public value
+          together with her RSA signature on it.
+          Alice's DH public value: (72fdd1cf5f73..., 2aeb2dfa309f...)  [255 & 254 bits]
+  [Eve] forwards Alice's message but flips ONE bit of the
+  [Eve] DH public value.
+
+  Step 2  Bob verifies the signature against ALICE's trusted
+          long-term public key...
+          VERIFICATION FAILED. Bob aborts; no key is created.
+
+------------------------------------------------------------
+RUN 6 -- Eve impersonates Bob on the return path
+------------------------------------------------------------
+  Parameter check OK: both generator coordinates exceed 1.
+
+  Step 1  Alice picks a fresh secret and sends her DH public value
+          together with her RSA signature on it.
+          Alice's DH public value: (bf6341c1fb09..., 5c54e6d2f6a7...)  [256 & 255 bits]
+
+  Step 2  Bob verifies the signature against ALICE's trusted
+          long-term public key...
+          Signature valid: the value really came from Alice.
+          Bob replies with his own signed DH public value.
+          Bob's DH public value:   (40e22eaccac3..., 9f383f84d42b...)  [255 & 256 bits]
+  [Eve] answers Alice pretending to be Bob, with her own
+  [Eve] value signed under her own key.
+
+  Step 3  Alice verifies the signature against BOB's trusted
+          long-term public key...
+          VERIFICATION FAILED. Alice aborts; no key is created.
+
+------------------------------------------------------------
+RUN 7 -- Eve poisons the public generator (G = 1)
+------------------------------------------------------------
+  [Eve] tampers with the PUBLIC PARAMETERS: she replaces the
+  [Eve] generator G by 1 + 0I, hoping both sides use it.
+  [!] Parameter check FAILED: the generator is trivial.
+  [!] Both parties reject the parameters; protocol aborts.
+
+============================================================
+Summary: the honest run completed with matching keys. Every
+forgery or tampering attempt was stopped at a signature gate
+or at the parameter sanity check, and the replay -- the only
+attack a signature alone cannot stop -- merely desynchronised
+the session without leaking anything to Eve.
